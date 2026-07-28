@@ -22,7 +22,7 @@ export default function Products() {
       const data = await productAPI.list(user.tenantId)
       setProducts(data)
     } catch (err) {
-      toast.error('Error al cargar productos')
+      toast.error('Error al cargar productos: ' + err.message)
     }
   }
 
@@ -32,12 +32,14 @@ export default function Products() {
       const data = await categoryAPI.list(user.tenantId)
       setCategories(data)
     } catch (err) {
-      console.error("Error al cargar categorías:", err)
+      toast.error('Error al cargar categorías: ' + err.message)
     }
   }
 
   useEffect(() => {
-    Promise.all([loadProducts(), loadCategories()]).finally(() => setLoading(false))
+    if (user?.tenantId) {
+      Promise.all([loadProducts(), loadCategories()]).finally(() => setLoading(false))
+    }
   }, [user])
 
   const handleSubmit = async (e) => {
