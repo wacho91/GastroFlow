@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { productAPI } from '../api'
+import { productAPI, categoryAPI } from '../api'
 import toast from 'react-hot-toast'
 
 export default function Products() {
   const { user } = useAuth()
   const [products, setProducts] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
     name: '', description: '', sku: '', barcode: '', type: 'sale',
@@ -22,12 +23,22 @@ export default function Products() {
       setProducts(data)
     } catch (err) {
       toast.error('Error al cargar productos')
-    } finally {
-      setLoading(false)
     }
   }
 
-  useEffect(() => { loadProducts() }, [user])
+  const loadCategories = async () => {
+    if (!user?.tenantId) return
+    try {
+      const data = await categoryAPI.list(user.tenantId)
+      setCategories(data)
+    } catch (err) {
+      console.error("Error al cargar categorías:", err)
+    }
+  }
+
+  useEffect(() => {
+    Promise.all([loadProducts(), loadCategories()]).finally(() => setLoading(false))
+  }, [user])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -88,14 +99,21 @@ export default function Products() {
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow mb-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <input placeholder="Nombre" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="border p-2 rounded" />
+           
+            {/* DESPLEGABLE DE CATEGORÍA */}
+            <select value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})} className="border p-2 rounded">
+              <option value="">Sin categoría</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+
             <input placeholder="SKU" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="border p-2 rounded" />
-            <input placeholder="Código de barras" value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} className="border p-2 rounded" />
             <input placeholder="Precio" type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value) || 0})} required className="border p-2 rounded" />
             <input placeholder="Costo" type="number" step="0.01" value={form.cost_price} onChange={e => setForm({...form, cost_price: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
             <input placeholder="Impuesto %" type="number" step="0.01" value={form.tax_percentage} onChange={e => setForm({...form, tax_percentage: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
             <input placeholder="Stock" type="number" step="0.01" value={form.stock} onChange={e => setForm({...form, stock: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
-            <input placeholder="Stock mínimo" type="number" step="0.01" value={form.min_stock} onChange={e => setForm({...form, min_stock: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
-            <input placeholder="Stock máximo" type="number" step="0.01" value={form.max_stock ?? ''} onChange={e => setForm({...form, max_stock: e.target.value ? parseFloat(e.target.value) : null})} className="border p-2 rounded" />
+           
             <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="border p-2 rounded">
               <option value="sale">Venta</option>
               <option value="ingredient">Ingrediente</option>
@@ -120,10 +138,9 @@ export default function Products() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
             </tr>
           </thead>
@@ -131,10 +148,9 @@ export default function Products() {
             {products.map(p => (
               <tr key={p.id}>
                 <td className="px-6 py-4 whitespace-nowrap">{p.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{p.sku || '-'}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{categories.find(c => c.id === p.category_id)?.name || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">${p.price.toFixed(2)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{p.stock}</td>
-                <td className="px-6 py-4 whitespace-nowrap capitalize">{p.type}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
                   <button onClick={() => handleEdit(p)} className="text-blue-600 hover:underline">Editar</button>
                   <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:underline">Desactivar</button>
@@ -142,7 +158,7 @@ export default function Products() {
               </tr>
             ))}
             {products.length === 0 && (
-              <tr><td colSpan="6" className="text-center py-4 text-gray-500">No hay productos</td></tr>
+              <tr><td colSpan="5" className="text-center py-4 text-gray-500">No hay productos</td></tr>
             )}
           </tbody>
         </table>
