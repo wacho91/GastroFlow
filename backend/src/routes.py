@@ -76,8 +76,7 @@ async def get_current_user(
     return user
 
 async def get_current_restaurant(user: User = Depends(get_current_user)) -> Restaurant:
-    # Se asume que user.tenant_id es el restaurant id
-    return user.restaurant  # cargado por relación
+    return user.restaurant
 
 # ------------------------------------------------------------------
 # Router
@@ -98,11 +97,9 @@ async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_sessio
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
 
-    # Update last_login
     user.last_login = datetime.utcnow()
     await db.flush()
 
-    # METEMOS EL NOMBRE Y ROL EN EL TOKEN
     access_token = create_access_token(data={
         "sub": user.id,
         "tenant": user.tenant_id,
@@ -111,7 +108,6 @@ async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_sessio
     })
     refresh_token = create_refresh_token(data={"sub": user.id, "tenant": user.tenant_id})
 
-    # Store refresh token hash
     token_hash = pwd_context.hash(refresh_token)
     refresh_token_obj = RefreshToken(
         tenant_id=user.tenant_id,
@@ -133,7 +129,6 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_session))
     except (JWTError, ValidationError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    # Verificar que el token no esté revocado y exista
     token_hash = pwd_context.hash(body.refresh_token)
     result = await db.execute(
         select(RefreshToken).where(
@@ -147,16 +142,13 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_session))
     if not stored_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired or revoked")
 
-    # Revocar el token usado (rotación)
     stored_token.is_revoked = 1
 
-    # Obtener usuario
     result_user = await db.execute(select(User).where(User.id == user_id))
     user = result_user.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    # METEMOS EL NOMBRE Y ROL EN EL TOKEN REFRESCADO TAMBIÉN
     access_token = create_access_token(data={
         "sub": user.id,
         "tenant": user.tenant_id,
@@ -165,7 +157,6 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_session))
     })
     new_refresh_token = create_refresh_token(data={"sub": user.id, "tenant": user.tenant_id})
 
-    # Almacenar nuevo refresh token
     new_token_hash = pwd_context.hash(new_refresh_token)
     new_token_obj = RefreshToken(
         tenant_id=user.tenant_id,
@@ -194,7 +185,6 @@ async def get_restaurant(restaurant_id: str, db: AsyncSession = Depends(get_sess
 
 @router.post("/restaurants", response_model=RestaurantResponse, status_code=status.HTTP_201_CREATED)
 async def create_restaurant(data: RestaurantCreate, db: AsyncSession = Depends(get_session)):
-    # Verificar tax_id único
     result = await db.execute(select(Restaurant).where(Restaurant.tax_id == data.tax_id))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Tax ID already exists")
@@ -241,7 +231,6 @@ async def create_user(tenant_id: str, data: UserCreate, db: AsyncSession = Depen
                       current_user: User = Depends(get_current_user)):
     if current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    # Verificar email único por tenant
     result = await db.execute(
         select(User).where(User.tenant_id == tenant_id, User.email == data.email)
     )
@@ -352,7 +341,6 @@ async def list_products(tenant_id: str, category_id: Optional[str] = Query(None)
         query = query.where(Product.category_id == category_id)
     result = await db.execute(query.order_by(Product.name))
     products = result.scalars().all()
-    # Cargar ingredientes
     product_ids = [p.id for p in products]
     if product_ids:
         ing_result = await db.execute(
@@ -364,7 +352,6 @@ async def list_products(tenant_id: str, category_id: Optional[str] = Query(None)
         for p in products:
             p.ingredients = []
             for ing in ingredients_map.get(p.id, []):
-                # Obtener nombre del ingrediente
                 ing_product = await db.get(Product, ing.ingredient_id)
                 p.ingredients.append(ProductIngredientResponse(
                     id=ing.id,
@@ -373,15 +360,14 @@ async def list_products(tenant_id: str, category_id: Optional[str] = Query(None)
                     quantity=ing.quantity,
                     unit=ing.unit
                 ))
-    return products 
+    return products
 
-    @router.post("/restaurants/{tenant_id}/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/restaurants/{tenant_id}/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(tenant_id: str, data: ProductCreate, db: AsyncSession = Depends(get_session),
                          current_user: User = Depends(get_current_user)):
     if current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
    
-    # Convertimos a diccionario y manejamos la categoría si viene vacía
     product_data = data.dict()
     if not product_data.get('category_id'):
         product_data['category_id'] = None
