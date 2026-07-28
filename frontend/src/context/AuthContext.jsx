@@ -15,12 +15,18 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const data = await authAPI.login(email, password)
     setTokens(data.access_token, data.refresh_token)
-    // Decodificar payload para obtener info del usuario (sin librería extra, parse manual)
+   
+    // Decodificar payload para obtener info del usuario
     const payload = JSON.parse(atob(data.access_token.split('.')[1]))
+   
+    // Si el backend devuelve un objeto 'user' en la respuesta, lo usamos. Si no, usamos el payload.
+    const userData = data.user || {};
+   
     setUser({
-      id: payload.sub,
-      tenantId: payload.tenant,
-      role: payload.role || 'user'
+      id: userData.id || payload.sub,
+      tenantId: userData.tenant_id || payload.tenant,
+      role: userData.role || payload.role || 'user',
+      full_name: userData.full_name || payload.full_name || payload.name || 'Administrador' // <--- AQUÍ ESTÁ LA MAGIA
     })
     return payload
   }, [])
@@ -39,7 +45,8 @@ export function AuthProvider({ children }) {
         setUser({
           id: payload.sub,
           tenantId: payload.tenant,
-          role: payload.role || 'user'
+          role: payload.role || 'user',
+          full_name: payload.full_name || payload.name || 'Administrador' // <--- Y AQUÍ TAMBIÉN
         })
       } catch {
         clearTokens()
