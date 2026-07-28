@@ -374,3 +374,4 @@ async def list_products(tenant_id: str, category_id: Optional[str] = Query(None)
                     unit=ing.unit
                 ))
     return products 
+    
