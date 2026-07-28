@@ -26,7 +26,7 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-lg font-semibold mb-4">Bienvenido, {user?.id}</h2>
+        <h2 className="text-lg font-semibold mb-4">Bienvenido, {user?.full_name || 'Administrador'} 👋</h2>
         <p className="text-gray-600">Has iniciado sesión como {user?.role}. Usa el panel lateral para navegar.</p>
       </div>
     </div>

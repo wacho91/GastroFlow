@@ -1,14 +1,9 @@
-// ---------------------------------------------------------------
-// Cliente API de GastroFlow - conecta con los endpoints exactos del backend
-// ---------------------------------------------------------------
+const BASE_URL = 'http://localhost:8000/api/v1'
 
-const BASE_URL = '/api' // se redirige por proxy en desarrollo
-
-// ---------- helpers ----------
 let accessToken = localStorage.getItem('access_token') || null
 let refreshToken = localStorage.getItem('refresh_token') || null
 
-let onAuthError = null // callback para logout automático
+let onAuthError = null
 
 export function setTokens(access, refresh) {
   accessToken = access
@@ -57,14 +52,12 @@ async function apiFetch(url, options = {}) {
 
   let resp = await fetch(`${BASE_URL}${url}`, config)
 
-  // Si 401, intentar refresh
   if (resp.status === 401 && refreshToken) {
     try {
       const newToken = await refreshAccessToken()
       config.headers['Authorization'] = `Bearer ${newToken}`
       resp = await fetch(`${BASE_URL}${url}`, config)
-    } catch {
-      // si falla refresh, lanza el error original
+    } catch (e) {
       throw new Error('Authentication failed')
     }
   }
@@ -75,19 +68,17 @@ async function apiFetch(url, options = {}) {
     try {
       const errJson = JSON.parse(errorBody)
       message = errJson.detail || message
-    } catch {}
+    } catch (e) {
+      console.log("Parse error ignored");
+    }
     throw new Error(message)
   }
 
-  // 204 No Content
   if (resp.status === 204) return null
 
   return resp.json()
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Autenticación
-// ---------------------------------------------------------------
 export const authAPI = {
   login: (email, password) =>
     apiFetch('/auth/login', {
@@ -101,9 +92,6 @@ export const authAPI = {
     })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Restaurantes
-// ---------------------------------------------------------------
 export const restaurantAPI = {
   list: () => apiFetch('/restaurants'),
   get: (id) => apiFetch(`/restaurants/${id}`),
@@ -121,9 +109,6 @@ export const restaurantAPI = {
     apiFetch(`/restaurants/${id}`, { method: 'DELETE' })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Usuarios (tenant scoped)
-// ---------------------------------------------------------------
 export const userAPI = {
   list: (tenantId) => apiFetch(`/restaurants/${tenantId}/users`),
   get: (userId) => apiFetch(`/users/${userId}`),
@@ -141,9 +126,6 @@ export const userAPI = {
     apiFetch(`/users/${userId}`, { method: 'DELETE' })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Categorías
-// ---------------------------------------------------------------
 export const categoryAPI = {
   list: (tenantId) => apiFetch(`/restaurants/${tenantId}/categories`),
   create: (tenantId, data) =>
@@ -160,9 +142,6 @@ export const categoryAPI = {
     apiFetch(`/categories/${categoryId}`, { method: 'DELETE' })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Productos
-// ---------------------------------------------------------------
 export const productAPI = {
   list: (tenantId, categoryId) => {
     let suffix = ''
@@ -184,9 +163,6 @@ export const productAPI = {
     apiFetch(`/products/${productId}`, { method: 'DELETE' })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Órdenes
-// ---------------------------------------------------------------
 export const orderAPI = {
   list: (tenantId, status) => {
     let suffix = ''
@@ -213,9 +189,6 @@ export const orderAPI = {
     })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Inventario
-// ---------------------------------------------------------------
 export const inventoryAPI = {
   list: (tenantId, productId) => {
     let suffix = ''
@@ -229,9 +202,6 @@ export const inventoryAPI = {
     })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Facturación
-// ---------------------------------------------------------------
 export const invoiceAPI = {
   list: (tenantId) => apiFetch(`/restaurants/${tenantId}/invoices`),
   create: (tenantId, data) =>
@@ -241,9 +211,6 @@ export const invoiceAPI = {
     })
 }
 
-// ---------------------------------------------------------------
-// Endpoints de Auditoría
-// ---------------------------------------------------------------
 export const auditLogAPI = {
   list: (tenantId, entityType) => {
     let suffix = ''
@@ -252,16 +219,12 @@ export const auditLogAPI = {
   }
 }
 
-// ---------------------------------------------------------------
-// WebSocket helper
-// ---------------------------------------------------------------
 export function createWebSocket(tenantId) {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const wsUrl = `${protocol}//${window.location.host}/api/ws/${tenantId}?token=${accessToken}`
   return new WebSocket(wsUrl)
 }
 
-// Exportar utilidad para manejar errores de red
 export const handleApiError = (error) => {
   if (error.message === 'Authentication failed') {
     clearTokens()
