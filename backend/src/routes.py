@@ -374,4 +374,46 @@ async def list_products(tenant_id: str, category_id: Optional[str] = Query(None)
                     unit=ing.unit
                 ))
     return products 
-    
+
+    @router.post("/restaurants/{tenant_id}/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
+async def create_product(tenant_id: str, data: ProductCreate, db: AsyncSession = Depends(get_session),
+                         current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+   
+    # Convertimos a diccionario y manejamos la categoría si viene vacía
+    product_data = data.dict()
+    if not product_data.get('category_id'):
+        product_data['category_id'] = None
+       
+    product = Product(tenant_id=tenant_id, **product_data)
+    db.add(product)
+    await db.flush()
+    return product
+
+@router.put("/products/{product_id}", response_model=ProductResponse)
+async def update_product(product_id: str, data: ProductUpdate, db: AsyncSession = Depends(get_session),
+                         current_user: User = Depends(get_current_user)):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product or product.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+   
+    update_data = data.dict(exclude_unset=True)
+    if 'category_id' in update_data and not update_data['category_id']:
+        update_data['category_id'] = None
+       
+    for field, value in update_data.items():
+        setattr(product, field, value)
+    await db.flush()
+    return product
+
+@router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_product(product_id: str, db: AsyncSession = Depends(get_session),
+                         current_user: User = Depends(get_current_user)):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product or product.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    product.is_active = 0
+    await db.flush()
