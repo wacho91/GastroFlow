@@ -99,38 +99,72 @@ export default function Products() {
 
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow mb-6 space-y-4">
+         
+          {/* Sección de Información Básica */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input placeholder="Nombre" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="border p-2 rounded" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto</label>
+              <input placeholder="Ej: Punta de Anca" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required className="border p-2 rounded w-full" />
+            </div>
            
-            {/* DESPLEGABLE DE CATEGORÍA */}
-            <select value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})} className="border p-2 rounded">
-              <option value="">Sin categoría</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+              <select value={form.category_id} onChange={e => setForm({...form, category_id: e.target.value})} className="border p-2 rounded w-full">
+                <option value="">Sin categoría</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
 
-            <input placeholder="SKU" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="border p-2 rounded" />
-            <input placeholder="Precio" type="number" step="0.01" value={form.price} onChange={e => setForm({...form, price: parseFloat(e.target.value) || 0})} required className="border p-2 rounded" />
-            <input placeholder="Costo" type="number" step="0.01" value={form.cost_price} onChange={e => setForm({...form, cost_price: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
-            <input placeholder="Impuesto %" type="number" step="0.01" value={form.tax_percentage} onChange={e => setForm({...form, tax_percentage: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
-            <input placeholder="Stock" type="number" step="0.01" value={form.stock} onChange={e => setForm({...form, stock: parseFloat(e.target.value) || 0})} className="border p-2 rounded" />
-           
-            <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="border p-2 rounded">
-              <option value="sale">Venta</option>
-              <option value="ingredient">Ingrediente</option>
-            </select>
-            <select value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="border p-2 rounded">
-              <option value="unit">Unidad</option>
-              <option value="kg">kg</option>
-              <option value="g">g</option>
-              <option value="lt">Litro</option>
-              <option value="ml">ml</option>
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">SKU (Código interno)</label>
+              <input placeholder="Ej: PARRILLA-001" value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} className="border p-2 rounded w-full" />
+            </div>
           </div>
-          <textarea placeholder="Descripción" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="border p-2 rounded w-full" rows="2" />
+
+          {/* Sección de Precios e Impuestos (Enteros) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta ($)</label>
+              <input placeholder="Ej: 35000" type="number" step="1" value={form.price} onChange={e => setForm({...form, price: parseInt(e.target.value) || 0})} required className="border p-2 rounded w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Costo ($)</label>
+              <input placeholder="Ej: 18000" type="number" step="1" value={form.cost_price} onChange={e => setForm({...form, cost_price: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Impuesto (%)</label>
+              <input placeholder="Ej: 19" type="number" step="1" value={form.tax_percentage} onChange={e => setForm({...form, tax_percentage: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+            </div>
+          </div>
+
+          {/* Sección de Inventario (Enteros) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Stock Actual</label>
+              <input placeholder="Ej: 50" type="number" step="1" value={form.stock} onChange={e => setForm({...form, stock: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
+              <input placeholder="Ej: 5" type="number" step="1" value={form.min_stock} onChange={e => setForm({...form, min_stock: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Producto</label>
+              <select value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="border p-2 rounded w-full">
+                <option value="sale">Venta (Plato/Bebida)</option>
+                <option value="ingredient">Ingrediente (Insumo)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            <textarea placeholder="Ej: 300gr de carne a la parrilla con papas" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="border p-2 rounded w-full" rows="2" />
+          </div>
+
           <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
-            {editingId ? 'Actualizar' : 'Crear'}
+            {editingId ? 'Actualizar' : 'Crear Producto'}
           </button>
         </form>
       )}
@@ -151,7 +185,7 @@ export default function Products() {
               <tr key={p.id}>
                 <td className="px-6 py-4 whitespace-nowrap">{p.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{categories.find(c => c.id === p.category_id)?.name || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">${p.price.toFixed(2)}</td>
+                <td className="px-6 py-4 whitespace-nowrap">${p.price}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{p.stock}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
                   <button onClick={() => handleEdit(p)} className="text-blue-600 hover:underline">Editar</button>
