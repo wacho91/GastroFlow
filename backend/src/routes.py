@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSoc
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload  # <--- IMPORT AÑADIDO PARA CARGAR RELACIONES
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import ValidationError
@@ -413,23 +414,13 @@ async def list_orders(tenant_id: str, status: Optional[str] = Query(None),
     if current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
    
-    query = select(Order).where(Order.tenant_id == tenant_id)
+    query = select(Order).options(selectinload(Order.items)).where(Order.tenant_id == tenant_id)
     if status:
-        # Permitir filtrar por múltiples estados separados por coma
         status_list = status.split(',')
         query = query.where(Order.status.in_(status_list))
        
     result = await db.execute(query.order_by(Order.created_at.desc()))
-    orders = result.scalars().all()
-   
-    # Cargar los items para cada orden
-    for order in orders:
-        items_result = await db.execute(
-            select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.sort_order)
-        )
-        order.items = items_result.scalars().all()
-       
-    return orders
+    return result.scalars().all()
 
 @router.post("/restaurants/{tenant_id}/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Depends(get_session),
@@ -492,10 +483,10 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
    
     await db.flush()
    
-    # 4. Cargar los items para la respuesta
-    items_result = await db.execute(
-        select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.sort_order)
+    # 4. VOLVER A CONSULTAR LA ORDEN CON SUS RELACIONES (Evita el error MissingGreenlet)
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(Order.id == order.id)
     )
-    order.items = items_result.scalars().all()
-   
-    return order
+    return result.scalars().first()  
