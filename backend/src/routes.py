@@ -403,3 +403,99 @@ async def delete_product(product_id: str, db: AsyncSession = Depends(get_session
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     product.is_active = 0
     await db.flush()
+
+# ======================= ORDERS =======================
+
+@router.get("/restaurants/{tenant_id}/orders", response_model=List[OrderResponse])
+async def list_orders(tenant_id: str, status: Optional[str] = Query(None),
+                      db: AsyncSession = Depends(get_session),
+                      current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+   
+    query = select(Order).where(Order.tenant_id == tenant_id)
+    if status:
+        # Permitir filtrar por múltiples estados separados por coma
+        status_list = status.split(',')
+        query = query.where(Order.status.in_(status_list))
+       
+    result = await db.execute(query.order_by(Order.created_at.desc()))
+    orders = result.scalars().all()
+   
+    # Cargar los items para cada orden
+    for order in orders:
+        items_result = await db.execute(
+            select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.sort_order)
+        )
+        order.items = items_result.scalars().all()
+       
+    return orders
+
+@router.post("/restaurants/{tenant_id}/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Depends(get_session),
+                       current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+   
+    # 1. Crear la orden principal
+    order_data = data.dict(exclude={'items'})
+    order = Order(
+        **order_data,
+        tenant_id=tenant_id,
+        created_by=current_user.id,
+        status='pending'
+    )
+    db.add(order)
+    await db.flush() # Para obtener el ID de la orden
+   
+    # 2. Crear los items de la orden y calcular totales
+    subtotal = 0.0
+    tax_total = 0.0
+   
+    for idx, item_data in enumerate(data.items):
+        # Buscar el producto para asegurar que existe y obtener precio/tax
+        product = await db.get(Product, item_data.product_id)
+        if not product:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item_data.product_id} not found")
+           
+        unit_price = item_data.unit_price if item_data.unit_price else product.price
+        quantity = item_data.quantity
+        tax_percentage = product.tax_percentage if hasattr(product, 'tax_percentage') else 0.0
+       
+        item_subtotal = unit_price * quantity
+        item_tax = item_subtotal * (tax_percentage / 100)
+        item_total = item_subtotal + item_tax
+       
+        order_item = OrderItem(
+            tenant_id=tenant_id,
+            order_id=order.id,
+            product_id=product.id,
+            product_name=product.name,
+            quantity=quantity,
+            unit_price=unit_price,
+            tax_percentage=tax_percentage,
+            tax_amount=item_tax,
+            subtotal=item_subtotal,
+            total=item_total,
+            sort_order=idx,
+            status='pending'
+        )
+        db.add(order_item)
+       
+        subtotal += item_subtotal
+        tax_total += item_tax
+       
+    # 3. Actualizar totales en la orden
+    order.subtotal = subtotal
+    order.tax_total = tax_total
+    order.total = subtotal + tax_total - (order.discount or 0)
+   
+    await db.flush()
+   
+    # 4. Cargar los items para la respuesta
+    items_result = await db.execute(
+        select(OrderItem).where(OrderItem.order_id == order.id).order_by(OrderItem.sort_order)
+    )
+    order.items = items_result.scalars().all()
+   
+    return order
