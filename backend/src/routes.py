@@ -477,7 +477,7 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
         tax_total += item_tax
        
     # 3. Actualizar totales en la orden
-    order.subtotal = subtotal
+    order.su  btotal = subtotal
     order.tax_total = tax_total
     order.total = subtotal + tax_total - (order.discount or 0)
    
@@ -489,4 +489,4 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
         .options(selectinload(Order.items))
         .where(Order.id == order.id)
     )
-    return result.scalars().first()  
+    return result.scalars().first()
