@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, Query
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload  # <--- IMPORT AÑADIDO PARA CARGAR RELACIONES
+from sqlalchemy.orm import selectinload
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import ValidationError
@@ -80,9 +80,41 @@ async def get_current_restaurant(user: User = Depends(get_current_user)) -> Rest
     return user.restaurant
 
 # ------------------------------------------------------------------
-# Router
+# Router y WebSockets
 # ------------------------------------------------------------------
 router = APIRouter()
+
+# === GESTOR DE WEBSOCKETS PARA TIEMPO REAL ===
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, tenant_id: str):
+        await websocket.accept()
+        if tenant_id not in self.active_connections:
+            self.active_connections[tenant_id] = []
+        self.active_connections[tenant_id].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, tenant_id: str):
+        if tenant_id in self.active_connections:
+            if websocket in self.active_connections[tenant_id]:
+                self.active_connections[tenant_id].remove(websocket)
+
+    async def broadcast_to_tenant(self, tenant_id: str, message: dict):
+        if tenant_id in self.active_connections:
+            for connection in self.active_connections[tenant_id]:
+                await connection.send_json(message)
+
+manager = ConnectionManager()
+
+@router.websocket("/ws/{tenant_id}")
+async def websocket_endpoint(websocket: WebSocket, tenant_id: str):
+    await manager.connect(websocket, tenant_id)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, tenant_id)
 
 # ======================= AUTH =======================
 
@@ -428,13 +460,19 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
     if current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
    
+    # 0. Calcular el número de pedido consecutivo
+    result_max = await db.execute(select(func.max(Order.order_number)).where(Order.tenant_id == tenant_id))
+    max_num = result_max.scalar()
+    next_num = (max_num or 0) + 1
+   
     # 1. Crear la orden principal
     order_data = data.dict(exclude={'items'})
     order = Order(
         **order_data,
         tenant_id=tenant_id,
         created_by=current_user.id,
-        status='pending'
+        status='pending',
+        order_number=next_num  # <--- ASIGNAMOS EL NÚMERO AQUÍ
     )
     db.add(order)
     await db.flush() # Para obtener el ID de la orden
@@ -444,7 +482,6 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
     tax_total = 0.0
    
     for idx, item_data in enumerate(data.items):
-        # Buscar el producto para asegurar que existe y obtener precio/tax
         product = await db.get(Product, item_data.product_id)
         if not product:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {item_data.product_id} not found")
@@ -477,16 +514,18 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
         tax_total += item_tax
        
     # 3. Actualizar totales en la orden
-    order.su  btotal = subtotal
+    order.subtotal = subtotal
     order.tax_total = tax_total
     order.total = subtotal + tax_total - (order.discount or 0)
-   
     await db.flush()
    
-    # 4. VOLVER A CONSULTAR LA ORDEN CON SUS RELACIONES (Evita el error MissingGreenlet)
+    # 4. VOLVER A CONSULTAR LA ORDEN CON SUS RELACIONES
     result = await db.execute(
-        select(Order)
-        .options(selectinload(Order.items))
-        .where(Order.id == order.id)
+        select(Order).options(selectinload(Order.items)).where(Order.id == order.id)
     )
-    return result.scalars().first()
+    final_order = result.scalars().first()
+   
+    # 5. ENVIAR SEÑAL EN TIEMPO REAL A LA COCINA (WEBSOCKET)
+    await manager.broadcast_to_tenant(tenant_id, {"event": "new_order", "order_id": str(final_order.id)})
+   
+    return final_order
