@@ -472,10 +472,10 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
         tenant_id=tenant_id,
         created_by=current_user.id,
         status='pending',
-        order_number=next_num  # <--- ASIGNAMOS EL NÚMERO AQUÍ
+        order_number=next_num
     )
     db.add(order)
-    await db.flush() # Para obtener el ID de la orden
+    await db.flush()
    
     # 2. Crear los items de la orden y calcular totales
     subtotal = 0.0
@@ -512,6 +512,26 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
        
         subtotal += item_subtotal
         tax_total += item_tax
+
+        # === DESCUENTO AUTOMÁTICO DE INVENTARIO (KARDEX) ===
+        # 1. Restamos la cantidad del producto
+        current_stock = product.stock if product.stock else 0
+        product.stock = current_stock - quantity
+
+        # 2. Registramos el movimiento de salida en el inventario
+        inv_movement = InventoryMovement(
+            tenant_id=tenant_id,
+            product_id=product.id,
+            movement_type='out',
+            quantity=quantity,
+            unit_cost=product.cost_price or 0.0,
+            total_cost=(product.cost_price or 0.0) * quantity,
+            reference_type='order',
+            reference_id=order.id,
+            description=f"Venta Orden #{order.order_number}",
+            created_by=current_user.id
+        )
+        db.add(inv_movement)
        
     # 3. Actualizar totales en la orden
     order.subtotal = subtotal
