@@ -83,6 +83,9 @@ export default function Products() {
     }
   }
 
+  // Función mágica para seleccionar el texto al hacer clic
+  const handleFocus = (e) => e.target.select()
+
   if (loading) return <div className="text-center py-12">Cargando...</div>
 
   return (
@@ -123,31 +126,72 @@ export default function Products() {
             </div>
           </div>
 
-          {/* Sección de Precios e Impuestos (Enteros) */}
+          {/* Sección de Precios e Impuestos (Con el truco de seleccionar al hacer clic) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta ($)</label>
-              <input placeholder="Ej: 35000" type="number" step="1" value={form.price} onChange={e => setForm({...form, price: parseInt(e.target.value) || 0})} required className="border p-2 rounded w-full" />
+              <input
+                placeholder="Ej: 35000"
+                type="number"
+                step="1"
+                value={form.price}
+                onFocus={handleFocus}
+                onChange={e => setForm({...form, price: parseInt(e.target.value) || 0})}
+                required
+                className="border p-2 rounded w-full"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Costo ($)</label>
-              <input placeholder="Ej: 18000" type="number" step="1" value={form.cost_price} onChange={e => setForm({...form, cost_price: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+              <input
+                placeholder="Ej: 18000"
+                type="number"
+                step="1"
+                value={form.cost_price}
+                onFocus={handleFocus}
+                onChange={e => setForm({...form, cost_price: parseInt(e.target.value) || 0})}
+                className="border p-2 rounded w-full"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Impuesto (%)</label>
-              <input placeholder="Ej: 19" type="number" step="1" value={form.tax_percentage} onChange={e => setForm({...form, tax_percentage: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+              <input
+                placeholder="Ej: 19"
+                type="number"
+                step="1"
+                value={form.tax_percentage}
+                onFocus={handleFocus}
+                onChange={e => setForm({...form, tax_percentage: parseInt(e.target.value) || 0})}
+                className="border p-2 rounded w-full"
+              />
             </div>
           </div>
 
-          {/* Sección de Inventario (Enteros) */}
+          {/* Sección de Inventario */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Stock Actual</label>
-              <input placeholder="Ej: 50" type="number" step="1" value={form.stock} onChange={e => setForm({...form, stock: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+              <input
+                placeholder="Ej: 50"
+                type="number"
+                step="1"
+                value={form.stock}
+                onFocus={handleFocus}
+                onChange={e => setForm({...form, stock: parseInt(e.target.value) || 0})}
+                className="border p-2 rounded w-full"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
-              <input placeholder="Ej: 5" type="number" step="1" value={form.min_stock} onChange={e => setForm({...form, min_stock: parseInt(e.target.value) || 0})} className="border p-2 rounded w-full" />
+              <input
+                placeholder="Ej: 5"
+                type="number"
+                step="1"
+                value={form.min_stock}
+                onFocus={handleFocus}
+                onChange={e => setForm({...form, min_stock: parseInt(e.target.value) || 0})}
+                className="border p-2 rounded w-full"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Producto</label>
