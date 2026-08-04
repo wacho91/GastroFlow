@@ -14,6 +14,9 @@ export default function Orders() {
     table_number: '', customer_name: '', customer_document: '', notes: '', items: [{ product_id: '', quantity: 1, unit_price: 0, discount: 0, tax_percentage: 0, notes: '', sort_order: 0 }]
   })
 
+  // El truco para seleccionar el número al hacer clic
+  const handleFocus = (e) => e.target.select()
+
   const loadOrders = async () => {
     if (!user?.tenantId) return
     try {
@@ -89,7 +92,6 @@ export default function Orders() {
     }
   }
 
-  // Función para cancelar pedido (soft delete)
   const handleCancel = async (orderId) => {
     if (!confirm('¿Cancelar este pedido?')) return
     try {
@@ -102,6 +104,9 @@ export default function Orders() {
   }
 
   if (loading) return <div className="text-center py-12">Cargando...</div>
+
+  // Clase mágica de Tailwind para quitar las flechitas de los números
+  const inputNoSpinner = "border p-2 rounded [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 
   return (
     <div>
@@ -135,7 +140,7 @@ export default function Orders() {
             <input placeholder="Documento cliente" value={newOrder.customer_document} onChange={e => setNewOrder({...newOrder, customer_document: e.target.value})} className="border p-2 rounded" />
           </div>
           <textarea placeholder="Notas" value={newOrder.notes} onChange={e => setNewOrder({...newOrder, notes: e.target.value})} className="border p-2 rounded w-full" rows="2" />
-          
+         
           <h3 className="font-semibold">Items del pedido</h3>
           {newOrder.items.map((item, idx) => (
             <div key={idx} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end border-b pb-2">
@@ -145,9 +150,41 @@ export default function Orders() {
                   <option key={p.id} value={p.id}>{p.name} - ${p.price}</option>
                 ))}
               </select>
-              <input type="number" placeholder="Cant." value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 1)} min="0.01" required className="border p-2 rounded" />
-              <input type="number" placeholder="Precio" value={item.unit_price} onChange={e => handleItemChange(idx, 'unit_price', parseFloat(e.target.value) || 0)} required className="border p-2 rounded" />
-              <input type="number" placeholder="Descuento" value={item.discount} onChange={e => handleItemChange(idx, 'discount', parseFloat(e.target.value) || 0)} className="border p-2 rounded" />
+             
+              {/* CANTIDAD: ENTEROS Y SIN FLECHITAS */}
+              <input
+                type="number"
+                placeholder="Cant."
+                value={item.quantity}
+                onFocus={handleFocus}
+                onChange={e => handleItemChange(idx, 'quantity', parseInt(e.target.value) || 1)}
+                min="1"
+                step="1"
+                required
+                className={inputNoSpinner}
+              />
+             
+              {/* PRECIO: SIN FLECHITAS */}
+              <input
+                type="number"
+                placeholder="Precio"
+                value={item.unit_price}
+                onFocus={handleFocus}
+                onChange={e => handleItemChange(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                required
+                className={inputNoSpinner}
+              />
+             
+              {/* DESCUENTO: SIN FLECHITAS */}
+              <input
+                type="number"
+                placeholder="Descuento"
+                value={item.discount}
+                onFocus={handleFocus}
+                onChange={e => handleItemChange(idx, 'discount', parseFloat(e.target.value) || 0)}
+                className={inputNoSpinner}
+              />
+             
               <div className="flex gap-2">
                 <input placeholder="Nota" value={item.notes} onChange={e => handleItemChange(idx, 'notes', e.target.value)} className="border p-2 rounded flex-1" />
                 {newOrder.items.length > 1 && (
@@ -160,7 +197,7 @@ export default function Orders() {
             </div>
           ))}
           <button type="button" onClick={handleAddItem} className="text-blue-600 hover:underline">+ Agregar item</button>
-          
+         
           <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Crear pedido</button>
         </form>
       )}
@@ -175,7 +212,8 @@ export default function Orders() {
                 <p className="text-sm text-gray-600">Estado: <span className="font-medium capitalize">{order.status}</span></p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-bold">${order.total.toFixed(2)}</p>
+                {/* LIMPIEZA DE DECIMALES EN EL TOTAL */}
+                <p className="text-lg font-bold">${Math.round(order.total)}</p>
                 <div className="flex gap-2 mt-2">
                   {order.status === 'pending' && (
                     <button onClick={() => handleStatusChange(order.id, 'confirmed')} className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600">Confirmar</button>
@@ -202,7 +240,7 @@ export default function Orders() {
               <h4 className="text-sm font-medium text-gray-700">Items:</h4>
               <ul className="text-sm text-gray-600">
                 {order.items?.map(item => (
-                  <li key={item.id}>{item.product_name} x{item.quantity} - ${item.total.toFixed(2)}</li>
+                  <li key={item.id}>{item.product_name} x{Math.round(item.quantity)} - ${Math.round(item.total)}</li>
                 ))}
               </ul>
             </div>
