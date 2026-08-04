@@ -83,7 +83,6 @@ export default function Products() {
     }
   }
 
-  // Función mágica para seleccionar el texto al hacer clic
   const handleFocus = (e) => e.target.select()
 
   if (loading) return <div className="text-center py-12">Cargando...</div>
@@ -103,7 +102,6 @@ export default function Products() {
       {showForm && (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow mb-6 space-y-4">
          
-          {/* Sección de Información Básica */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Producto</label>
@@ -126,7 +124,7 @@ export default function Products() {
             </div>
           </div>
 
-          {/* Sección de Precios e Impuestos (Con el truco de seleccionar al hacer clic) */}
+          {/* CAJAS DE NÚMEROS SIN FLECHITAS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Precio Venta ($)</label>
@@ -138,7 +136,7 @@ export default function Products() {
                 onFocus={handleFocus}
                 onChange={e => setForm({...form, price: parseInt(e.target.value) || 0})}
                 required
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -150,7 +148,7 @@ export default function Products() {
                 value={form.cost_price}
                 onFocus={handleFocus}
                 onChange={e => setForm({...form, cost_price: parseInt(e.target.value) || 0})}
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -162,12 +160,11 @@ export default function Products() {
                 value={form.tax_percentage}
                 onFocus={handleFocus}
                 onChange={e => setForm({...form, tax_percentage: parseInt(e.target.value) || 0})}
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
           </div>
 
-          {/* Sección de Inventario */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Stock Actual</label>
@@ -178,7 +175,7 @@ export default function Products() {
                 value={form.stock}
                 onFocus={handleFocus}
                 onChange={e => setForm({...form, stock: parseInt(e.target.value) || 0})}
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -190,7 +187,7 @@ export default function Products() {
                 value={form.min_stock}
                 onFocus={handleFocus}
                 onChange={e => setForm({...form, min_stock: parseInt(e.target.value) || 0})}
-                className="border p-2 rounded w-full"
+                className="border p-2 rounded w-full [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
             <div>
@@ -230,7 +227,8 @@ export default function Products() {
                 <td className="px-6 py-4 whitespace-nowrap">{p.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{categories.find(c => c.id === p.category_id)?.name || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap">${p.price}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{p.stock}</td>
+                {/* REDONDEAR EL STOCK PARA QUE NO SALGAN DECIMALES FANTASMA */}
+                <td className="px-6 py-4 whitespace-nowrap">{Math.round(p.stock)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
                   <button onClick={() => handleEdit(p)} className="text-blue-600 hover:underline">Editar</button>
                   <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:underline">Desactivar</button>
