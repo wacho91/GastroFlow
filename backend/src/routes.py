@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
@@ -514,11 +515,9 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
         tax_total += item_tax
 
         # === DESCUENTO AUTOMÁTICO DE INVENTARIO (KARDEX) ===
-        # 1. Restamos la cantidad del producto
         current_stock = product.stock if product.stock else 0
         product.stock = current_stock - quantity
 
-        # 2. Registramos el movimiento de salida en el inventario
         inv_movement = InventoryMovement(
             tenant_id=tenant_id,
             product_id=product.id,
@@ -555,7 +554,6 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
 @router.put("/orders/{order_id}", response_model=OrderResponse)
 async def update_order(order_id: str, data: OrderUpdate, db: AsyncSession = Depends(get_session),
                        current_user: User = Depends(get_current_user)):
-    # Buscamos la orden y cargamos sus items para evitar el error de async
     result = await db.execute(
         select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
     )
@@ -563,12 +561,10 @@ async def update_order(order_id: str, data: OrderUpdate, db: AsyncSession = Depe
     if not order or order.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
    
-    # Actualizamos los campos que vengan del frontend (ej. el status)
     update_data = data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(order, field, value)
        
-    # Si el estado cambia a 'completed', registramos la fecha de finalización
     if update_data.get('status') == 'completed' and not order.completed_at:
         order.completed_at = datetime.utcnow()
        
@@ -583,6 +579,79 @@ async def cancel_order(order_id: str, db: AsyncSession = Depends(get_session),
     if not order or order.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
    
-    # En lugar de borrar la factura, la marcamos como cancelada
     order.status = 'cancelled'
     await db.flush()
+
+# ======================= INVOICES (FACTURACIÓN DIAN) =======================
+
+def generate_cufe(invoice_number: str, nit: str, date_str: str, total: float, tax_total: float):
+    """Genera un CUFE simulado usando SHA-384 como lo pide la DIAN."""
+    cufe_string = f"{invoice_number}{date_str}{nit}800197268{total}{tax_total}{total}GastroFlowPIN123"
+    return hashlib.sha384(cufe_string.encode('utf-8')).hexdigest()
+
+@router.get("/restaurants/{tenant_id}/invoices", response_model=List[InvoiceResponse])
+async def list_invoices(tenant_id: str, db: AsyncSession = Depends(get_session),
+                        current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    result = await db.execute(
+        select(Invoice).where(Invoice.tenant_id == tenant_id).order_by(Invoice.created_at.desc())
+    )
+    return result.scalars().all()
+
+@router.post("/restaurants/{tenant_id}/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
+async def create_invoice(tenant_id: str, data: InvoiceCreate, db: AsyncSession = Depends(get_session),
+                         current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+   
+    # 1. Buscar la orden a facturar
+    result = await db.execute(
+        select(Order).options(selectinload(Order.items)).where(Order.id == data.order_id)
+    )
+    order = result.scalars().first()
+    if not order or order.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+   
+    # 2. Verificar si ya tiene factura
+    existing_inv = await db.execute(select(Invoice).where(Invoice.order_id == order.id))
+    if existing_inv.scalars().first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La orden ya tiene una factura generada")
+   
+    # 3. Obtener datos del restaurante (NIT y resolución)
+    restaurant = await db.get(Restaurant, tenant_id)
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant not found")
+       
+    # 4. Generar número de factura consecutivo
+    current_inv_num = restaurant.current_invoice_number or 0
+    new_inv_num = current_inv_num + 1
+    restaurant.current_invoice_number = new_inv_num
+   
+    # 5. Generar el CUFE (Código Único de Factura Electrónica)
+    date_str = datetime.utcnow().isoformat()
+    cufe = generate_cufe(str(new_inv_num), restaurant.tax_id, date_str, order.total, order.tax_total)
+   
+    # 6. Crear el registro de Factura
+    invoice = Invoice(
+        tenant_id=tenant_id,
+        order_id=order.id,
+        invoice_number=str(new_inv_num),
+        cufe=cufe,
+        dian_status='accepted', # Simulamos que la DIAN la aceptó al instante
+        dian_status_message='Factura procesada correctamente en entorno de pruebas.',
+        customer_name=order.customer_name,
+        customer_document=data.customer_document if data.customer_document else order.customer_document,
+        subtotal=order.subtotal,
+        tax_total=order.tax_total,
+        total=order.total,
+        created_by=current_user.id
+    )
+    db.add(invoice)
+   
+    # 7. Marcar la orden como completada
+    order.status = 'completed'
+    order.completed_at = datetime.utcnow()
+   
+    await db.flush()
+    return invoice
