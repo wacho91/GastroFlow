@@ -14,7 +14,6 @@ import Kitchen from './pages/Kitchen'
 import Inventory from './pages/Inventory'
 import Invoices from './pages/Invoices'
 import AuditLogs from './pages/AuditLogs'
-Import Invoices from './pages/Invoices'
 
 export default function App() {
   return (
@@ -39,7 +38,6 @@ export default function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="audit-logs" element={<AuditLogs />} />
-   <Route path="/invoices" element={<Invoices />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
