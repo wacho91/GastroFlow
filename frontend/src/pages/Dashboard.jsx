@@ -7,9 +7,9 @@ import toast from 'react-hot-toast'
 export default function Dashboard() {
   const { user } = useAuth()
   const [stats, setStats] = useState({
-    ordersToday: 0,
+    activeOrders: 0,
     activeProducts: 0,
-    revenueToday: 0,
+    totalRevenue: 0,
     stockAlerts: 0
   })
   const [weeklyData, setWeeklyData] = useState([])
@@ -25,44 +25,47 @@ export default function Dashboard() {
           productAPI.list(user.tenantId)
         ])
 
-        const today = new Date().toDateString()
-
-        // 1. Tarjetas de Métricas
-        const ordersToday = orders.filter(o => new Date(o.created_at).toDateString() === today)
-        const paidOrdersToday = ordersToday.filter(o => o.status === 'completed' || o.status === 'served')
-        const revenueToday = paidOrdersToday.reduce((sum, o) => sum + (o.total || 0), 0)
+        // 1. Tarjetas de Métricas (Sumamos TODOS los pedidos activos)
+        // Un pedido activo es cualquiera que NO esté cancelado
+        const activeOrders = orders.filter(o => o.status !== 'cancelled')
+       
+        // Sumamos el total de dinero de todos esos pedidos activos
+        const totalRevenue = activeOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+       
+        // Alertas de stock
         const stockAlerts = products.filter(p => p.stock <= p.min_stock).length
 
         setStats({
-          ordersToday: ordersToday.length,
+          activeOrders: activeOrders.length,
           activeProducts: products.length,
-          revenueToday: revenueToday,
+          totalRevenue: totalRevenue,
           stockAlerts: stockAlerts
         })
 
-        // 2. Datos para Gráfico de Barras (Ingresos de la última semana)
+        // 2. Datos para Gráfico de Barras (Ingresos por día de la semana)
         const last7Days = []
         for (let i = 6; i >= 0; i--) {
           const d = new Date()
           d.setDate(d.getDate() - i)
           const dayName = d.toLocaleDateString('es-ES', { weekday: 'short' })
          
+          // Sumar pedidos de ese día
           const dailyRevenue = orders
-            .filter(o => (o.status === 'completed' || o.status === 'served') && new Date(o.created_at).toDateString() === d.toDateString())
+            .filter(o => o.status !== 'cancelled' && new Date(o.created_at).toDateString() === d.toDateString())
             .reduce((sum, o) => sum + (o.total || 0), 0)
            
           last7Days.push({ name: dayName, Ingresos: dailyRevenue })
         }
         setWeeklyData(last7Days)
 
-        // 3. Datos para Gráfico de Pastel (Estados de los pedidos de hoy)
-        const statuses = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled']
+        // 3. Datos para Gráfico de Pastel (Estados de TODOS los pedidos activos)
+        const statuses = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed']
         const statusCounts = {}
-        ordersToday.forEach(o => {
+        activeOrders.forEach(o => {
           statusCounts[o.status] = (statusCounts[o.status] || 0) + 1
         })
         const pieData = statuses
-          .filter(s => statusCounts[s]) // Solo mostrar estados que tengan pedidos
+          .filter(s => statusCounts[s])
           .map(s => ({ name: s, value: statusCounts[s] }))
         setOrderStatusData(pieData)
 
@@ -91,12 +94,12 @@ export default function Dashboard() {
       {/* TARJETAS DE MÉTRICAS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-lg shadow-lg text-white">
-          <h3 className="text-blue-100 text-sm uppercase mb-1">Pedidos hoy</h3>
-          <p className="text-3xl font-bold">{stats.ordersToday}</p>
+          <h3 className="text-blue-100 text-sm uppercase mb-1">Pedidos Activos</h3>
+          <p className="text-3xl font-bold">{stats.activeOrders}</p>
         </div>
         <div className="bg-gradient-to-br from-green-500 to-green-700 p-6 rounded-lg shadow-lg text-white">
-          <h3 className="text-green-100 text-sm uppercase mb-1">Ingresos hoy</h3>
-          <p className="text-3xl font-bold">{formatCurrency(stats.revenueToday)}</p>
+          <h3 className="text-green-100 text-sm uppercase mb-1">Ingresos Totales</h3>
+          <p className="text-3xl font-bold">{formatCurrency(stats.totalRevenue)}</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow border border-gray-100">
           <h3 className="text-gray-500 text-sm uppercase mb-1">Productos activos</h3>
@@ -111,7 +114,7 @@ export default function Dashboard() {
       {/* SECCIÓN DE GRÁFICOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
        
-        {/* Gráfico de Barras: Ingresos de la semana */}
+        {/* Gráfico de Barras */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4 text-gray-700">Ingresos de la Última Semana</h2>
           <ResponsiveContainer width="100%" height={300}>
@@ -124,9 +127,9 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Gráfico de Pastel: Estados de pedidos de hoy */}
+        {/* Gráfico de Pastel */}
         <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-4 text-gray-700">Estado de Pedidos de Hoy</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-700">Estado de Pedidos (En vivo)</h2>
           {orderStatusData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -141,7 +144,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           ) : (
             <div className="h-[300px] flex items-center justify-center text-gray-400">
-              No hay pedidos hoy para graficar.
+              No hay pedidos activos para graficar.
             </div>
           )}
         </div>
