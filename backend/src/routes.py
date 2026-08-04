@@ -549,3 +549,40 @@ async def create_order(tenant_id: str, data: OrderCreate, db: AsyncSession = Dep
     await manager.broadcast_to_tenant(tenant_id, {"event": "new_order", "order_id": str(final_order.id)})
    
     return final_order
+
+# ======================= ORDER UPDATES & CANCELLATIONS =======================
+
+@router.put("/orders/{order_id}", response_model=OrderResponse)
+async def update_order(order_id: str, data: OrderUpdate, db: AsyncSession = Depends(get_session),
+                       current_user: User = Depends(get_current_user)):
+    # Buscamos la orden y cargamos sus items para evitar el error de async
+    result = await db.execute(
+        select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
+    )
+    order = result.scalars().first()
+    if not order or order.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+   
+    # Actualizamos los campos que vengan del frontend (ej. el status)
+    update_data = data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(order, field, value)
+       
+    # Si el estado cambia a 'completed', registramos la fecha de finalización
+    if update_data.get('status') == 'completed' and not order.completed_at:
+        order.completed_at = datetime.utcnow()
+       
+    await db.flush()
+    return order
+
+@router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_order(order_id: str, db: AsyncSession = Depends(get_session),
+                       current_user: User = Depends(get_current_user)):
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order or order.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+   
+    # En lugar de borrar la factura, la marcamos como cancelada
+    order.status = 'cancelled'
+    await db.flush()
