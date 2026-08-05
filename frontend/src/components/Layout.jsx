@@ -22,7 +22,7 @@ export default function Layout() {
   const visibleNavItems = navItems.filter(item => user && item.roles.includes(user.role))
 
   return (
-    <div className="min-h-screen flex bg-gray-900">
+    <div className="min-h-screen flex bg-gray-100 font-sans">
       {/* Sidebar Oscuro Elegante */}
       <aside className={`bg-gray-900 border-r border-gray-800 text-white w-64 flex-col transition-all duration-300 ${sidebarOpen ? 'flex fixed md:relative z-50 h-full' : 'hidden md:flex'}`}>
         <div className="p-6 border-b border-gray-800">
@@ -64,16 +64,16 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* Main content (Fondo claro para alto contraste) */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between md:hidden">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-400 text-2xl">
+        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between md:hidden">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-600 text-2xl">
             ☰
           </button>
-          <h1 className="text-lg font-bold text-amber-400">GastroFlow</h1>
+          <h1 className="text-lg font-bold text-amber-500">GastroFlow</h1>
           <div className="w-6"></div>
         </header>
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-gray-900 text-white">
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-gray-100 text-gray-800">
           {/* La animación fadeInUp se aplica al contenedor de cada página */}
           <div className="animate-fadeInUp">
             <Outlet />
