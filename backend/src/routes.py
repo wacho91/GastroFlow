@@ -655,3 +655,32 @@ async def create_invoice(tenant_id: str, data: InvoiceCreate, db: AsyncSession =
    
     await db.flush()
     return invoice
+
+# ======================= INVENTORY & AUDIT LOGS (GET ROUTES) =======================
+
+@router.get("/restaurants/{tenant_id}/inventory", response_model=List[InventoryMovementResponse])
+async def list_inventory(tenant_id: str, db: AsyncSession = Depends(get_session),
+                        current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+   
+    result = await db.execute(
+        select(InventoryMovement)
+        .where(InventoryMovement.tenant_id == tenant_id)
+        .order_by(InventoryMovement.created_at.desc())
+    )
+    return result.scalars().all()
+
+@router.get("/restaurants/{tenant_id}/audit-logs", response_model=List[AuditLogResponse])
+async def list_audit_logs(tenant_id: str, entity_type: Optional[str] = Query(None),
+                          db: AsyncSession = Depends(get_session),
+                          current_user: User = Depends(get_current_user)):
+    if current_user.tenant_id != tenant_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+   
+    query = select(AuditLog).where(AuditLog.tenant_id == tenant_id)
+    if entity_type:
+        query = query.where(AuditLog.entity_type == entity_type)
+       
+    result = await db.execute(query.order_by(AuditLog.created_at.desc()))
+    return result.scalars().all()
