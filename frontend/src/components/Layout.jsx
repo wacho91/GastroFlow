@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// 1. DEFINIMOS QUIÉN PUEDE VER QUÉ
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: '📊', roles: ['admin', 'supervisor'] },
   { to: '/restaurants', label: 'Restaurantes', icon: '🏪', roles: ['admin'] },
@@ -20,40 +19,45 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // 2. FILTRAMOS LOS ITEMS SEGÚN EL ROL DEL USUARIO LOGUEADO
   const visibleNavItems = navItems.filter(item => user && item.roles.includes(user.role))
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className={`bg-gray-800 text-white w-64 flex flex-col ${sidebarOpen ? 'block' : 'hidden'} md:block`}>
-        <div className="p-4 border-b border-gray-700">
-          <h1 className="text-xl font-bold">GastroFlow</h1>
-          <p className="text-sm text-gray-400 capitalize">Rol: {user?.role || 'N/A'}</p>
+    <div className="min-h-screen flex bg-gray-900">
+      {/* Sidebar Oscuro Elegante */}
+      <aside className={`bg-gray-900 border-r border-gray-800 text-white w-64 flex-col transition-all duration-300 ${sidebarOpen ? 'flex fixed md:relative z-50 h-full' : 'hidden md:flex'}`}>
+        <div className="p-6 border-b border-gray-800">
+          <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-amber-400 to-orange-500 text-transparent bg-clip-text">
+            GastroFlow
+          </h1>
+          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider">{user?.role || 'Rol'}</p>
         </div>
-        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-          {/* 3. PINTAMOS SOLO LOS ITEMS PERMITIDOS */}
+        <nav className="flex-1 overflow-y-auto py-4 space-y-1">
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-2 p-2 rounded hover:bg-gray-700 ${isActive ? 'bg-gray-700' : ''}`
+                `flex items-center gap-3 px-6 py-3 text-sm font-medium transition-all duration-200 border-l-4 ${
+                  isActive
+                    ? 'bg-gray-800 text-amber-400 border-amber-400'
+                    : 'text-gray-400 border-transparent hover:bg-gray-800/50 hover:text-white'
+                }`
               }
             >
-              <span>{item.icon}</span>
+              <span className="text-lg">{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-gray-700">
-          <div className="mb-4 text-sm text-gray-400">
-            <p className="font-bold text-white">{user?.full_name || 'Usuario'}</p>
-            <p className="truncate">{user?.id}</p>
+        <div className="p-4 border-t border-gray-800">
+          <div className="mb-4 px-4">
+            <p className="font-semibold text-white text-sm">{user?.full_name || 'Usuario'}</p>
+            <p className="text-xs text-gray-500 truncate">{user?.id}</p>
           </div>
           <button
             onClick={logout}
-            className="w-full text-left p-2 rounded hover:bg-red-600 transition flex items-center gap-2"
+            className="w-full flex items-center gap-2 justify-center text-sm p-2 rounded-lg text-gray-400 hover:bg-red-600 hover:text-white transition-colors duration-200"
           >
             🚪 Cerrar sesión
           </button>
@@ -61,16 +65,19 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        <header className="bg-white shadow px-4 py-3 flex items-center justify-between md:hidden">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-600">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between md:hidden">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="text-gray-400 text-2xl">
             ☰
           </button>
-          <h1 className="text-lg font-semibold">GastroFlow</h1>
-          <div></div>
+          <h1 className="text-lg font-bold text-amber-400">GastroFlow</h1>
+          <div className="w-6"></div>
         </header>
-        <main className="flex-1 p-6 overflow-y-auto bg-gray-100">
-          <Outlet />
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-gray-900 text-white">
+          {/* La animación fadeInUp se aplica al contenedor de cada página */}
+          <div className="animate-fadeInUp">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
