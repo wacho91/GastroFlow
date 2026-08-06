@@ -664,12 +664,35 @@ async def list_inventory(tenant_id: str, db: AsyncSession = Depends(get_session)
     if current_user.tenant_id != tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
    
+    # Hacemos un JOIN explícito para traer el nombre del producto
     result = await db.execute(
-        select(InventoryMovement)
+        select(InventoryMovement, Product.name)
+        .join(Product, InventoryMovement.product_id == Product.id)
         .where(InventoryMovement.tenant_id == tenant_id)
         .order_by(InventoryMovement.created_at.desc())
     )
-    return result.scalars().all()
+    rows = result.all()
+   
+    # Construir la respuesta manualmente para asegurar que product_name esté incluido
+    inventory_list = []
+    for movement, product_name in rows:
+        inventory_list.append({
+            "id": movement.id,
+            "tenant_id": movement.tenant_id,
+            "product_id": movement.product_id,
+            "product_name": product_name,  # <--- AQUÍ INYECTAMOS EL NOMBRE
+            "movement_type": movement.movement_type,
+            "quantity": movement.quantity,
+            "unit_cost": movement.unit_cost,
+            "total_cost": movement.total_cost,
+            "reference_type": movement.reference_type,
+            "reference_id": movement.reference_id,
+            "description": movement.description,
+            "created_by": movement.created_by,
+            "created_at": movement.created_at
+        })
+       
+    return inventory_list
 
 @router.get("/restaurants/{tenant_id}/audit-logs", response_model=List[AuditLogResponse])
 async def list_audit_logs(tenant_id: str, entity_type: Optional[str] = Query(None),
